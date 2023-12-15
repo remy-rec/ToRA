@@ -3,6 +3,7 @@ This script support vllm batch inference with cot/pal/tora prompt.
 Also sopport inference of fine-tuned models like WizardMath/ToRA.
 Code based on: https://github.com/microsoft/ProphetNet/tree/master/CRITIC
 """
+import json
 import random
 import os
 import argparse
@@ -89,6 +90,7 @@ def prepare_data(args):
 
 def main(args):
     examples, processed_samples, out_file = prepare_data(args)
+    epoch_prefix = out_file.replace(".jsonl", "")
 
     # init python executor
     if "pal" in args.prompt_type:
@@ -146,19 +148,27 @@ def main(args):
         if len(current_prompts) == 0:
             break
 
-        # get all outputs
-        prompts = [item[1] for item in current_prompts]
-        outputs = llm.generate(prompts, SamplingParams(
-                        temperature=args.temperature,
-                        top_p=args.top_p,
-                        max_tokens=args.max_tokens_per_call,
-                        n=1,
-                        stop=stop_tokens,
-        ))
+        epoch_file = f"{epoch_prefix}_epoch{epoch}.jsonl"
+        if os.path.exists(epoch_file):
+            with open(epoch_file, "r") as f:
+                outputs = [json.loads(line)["text"] for line in f.readlines()]
+        else:
+            # get all outputs
+            prompts = [item[1] for item in current_prompts]
+            outputs = llm.generate(prompts, SamplingParams(
+                            temperature=args.temperature,
+                            top_p=args.top_p,
+                            max_tokens=args.max_tokens_per_call,
+                            n=1,
+                            stop=stop_tokens,
+            ))
 
-        outputs = sorted(outputs, key=lambda x: int(x.request_id)) # sort outputs by request_id
-        outputs = [output.outputs[0].text for output in outputs]
-        assert len(outputs) == len(current_prompts)
+            outputs = sorted(outputs, key=lambda x: int(x.request_id)) # sort outputs by request_id
+            outputs = [output.outputs[0].text for output in outputs]
+            assert len(outputs) == len(current_prompts)
+            with open(epoch_file, "w") as f:
+                for output in outputs:
+                    f.write(json.dumps({"text": output}) + "\n")
 
         # process all outputs
         remain_prompts = []
