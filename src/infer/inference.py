@@ -69,7 +69,8 @@ def prepare_data(args):
     os.makedirs(f'{args.output_dir}/{model_name}/{args.data_name}', exist_ok=True)
 
     # load all processed samples
-    processed_files = [f for f in os.listdir(f"{args.output_dir}/{model_name}/{args.data_name}/") if f.endswith(".jsonl") and f.startswith(out_file_prefix)]    
+    processed_files = [f for f in os.listdir(f"{args.output_dir}/{model_name}/{args.data_name}/")
+                       if f.endswith(".jsonl") and f.startswith(out_file_prefix) and ("_epoch" not in f)]
     processed_samples = []
     for f in processed_files:
         processed_samples.extend(list(load_jsonl(f"{args.output_dir}/{model_name}/{args.data_name}/{f}")))
